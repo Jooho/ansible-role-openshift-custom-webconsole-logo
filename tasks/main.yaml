@@ -1,5 +1,5 @@
 ---
-# tasks file for ansible-role-openshift-custom-login-page
+# tasks file for ansible-role-openshift-custom-webconsole-page
 
   - name: Get timestamp
     local_action: command date +"%Y%m%d_%H%M%S"
@@ -20,10 +20,18 @@
     when: stat_logo_img_exist.stat.exists == false
     run_once: true
 
+  - name: fetch logo_image on local to copy it to all masters.
+    fetch:
+      src: "{{logo_img}}"
+      dest: "{{logo_img}}"
+      flat: yes
+    delegate_to: "{{groups.masters[0]}}"
+
+  - name: copy logo image to all masters
+    copy: "src={{logo_img}} dest={{logo_img}} "
+
   - name: Create temp dir if it does not exist
     file: "path={{temp_dir}} state=directory"
-    delegate_to: "{{groups.masters[0]}}"
-    run_once: true
 
   - name: Create stylesheet dir if it does not exist
     file: "path={{stylesheet_base_dir}} state=directory"
@@ -34,40 +42,26 @@
         - "{{stylesheet_base_dir}}/css"
         - "{{stylesheet_base_dir}}/images"
 
-  - name: Copy web console logo under {stylesheet_base_dir}}/images
-    synchronize: src={{logo_img}} dest="{{stylesheet_base_dir}}/images"
-    delegate_to: "{{groups.masters[0]}}"
+  - name: copy logo image to all masters
+    copy: "src={{logo_img}} dest={{stylesheet_base_dir}}/images"
 
   - name: Copy css file under {stylesheet_base_dir}}/css
     template: src=extensions.css.j2 dest="{{stylesheet_base_dir}}/css/extensions.css" force={{overwrite_force}}
 
   - name: Webconsole configuration txt file to /etc/origin/master
     template: src=webconsole_conf.txt.j2 dest={{stylesheet_base_dir}}/webconsole_conf.txt force={{overwrite_force}}
-    delegate_to: "{{groups.masters[0]}}"
-    run_once: true
 
   - name: Check the configuration exist in master-config.yaml
     shell: grep extensions {{openshift_master_conf_dir}}/master-config.yaml|wc -l
-    delegate_to: "{{groups.masters[0]}}"
     register: extension_conf_exist
-    run_once: true
    
   - name: Configure master-config.xml to load new logo for web console
     shell: sed -e "$(grep -n assetConfig {{openshift_master_conf_dir}}/master-config.yaml |cut -d':' -f1)r {{stylesheet_base_dir}}/webconsole_conf.txt" -i {{openshift_master_conf_dir}}/master-config.yaml
     when: extension_conf_exist.stdout == '0'
-    delegate_to: "{{groups.masters[0]}}"
-    run_once: true
-
-  - name: Copy new master-config.yaml to all master servers
-    synchronize:  src={{openshift_master_conf_dir}}/master-config.yaml dest={{openshift_master_conf_dir}}/master-config.yaml
-    delegate_to: "{{groups.masters[0]}}"
-    when: "inventory_hostname != groups.masters[0] and extension_conf_exist.stdout == '0'"
 
   - name: Clean temp files in local
     file: path={{item}} state=absent
     with_items:
         - "{{stylesheet_base_dir}}/webconsole_conf.txt"
         - "{{logo_img}}"
-    delegate_to: "{{groups.masters[0]}}"
-    run_once: true
 
