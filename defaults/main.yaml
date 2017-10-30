@@ -2,3 +2,4 @@ openshift_master_conf_dir: /etc/origin/master
 temp_dir: /tmp
 stylesheet_base_dir: /etc/origin/master/stylesheet
 overwrite_force: false
+restart_master: false

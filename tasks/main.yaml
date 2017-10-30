@@ -65,3 +65,11 @@
         - "{{stylesheet_base_dir}}/webconsole_conf.txt"
         - "{{logo_img}}"
 
+  - name: Restart Master Daemon
+    block:
+      - systemd: state=restarted name=atomic-openshift-master
+        when: groups['masters']|length|int == 1
+
+      - systemd: state=restarted name=atomic-openshift-master-api
+        when: groups['masters']|length|int > 1
+    when: restart_master
