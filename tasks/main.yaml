@@ -8,17 +8,20 @@
 
   - name: Backup original master-config.yaml file
     copy: src="{{openshift_master_conf_dir}}/master-config.yaml" dest="{{openshift_master_conf_dir}}/master-config.yaml_{{date.stdout}}" backup="yes" remote_src="true"
+    become: yes
 
   - name: Check if image exist
     stat: "path={{logo_img}} "
     delegate_to: "{{groups.masters[0]}}"
     register: stat_logo_img_exist
     run_once: true
+    become: yes
 
   - name: If the logo_img does not exit, it fails
     fail: msg="logo image does not exist, please check it"
     when: stat_logo_img_exist.stat.exists == false
     run_once: true
+    become: yes
 
   - name: fetch logo_image on local to copy it to all masters.
     fetch:
@@ -29,41 +32,51 @@
 
   - name: copy logo image to all masters
     copy: "src={{logo_img}} dest={{logo_img}} "
+    become: yes
 
   - name: Create temp dir if it does not exist
     file: "path={{temp_dir}} state=directory"
+    become: yes
 
   - name: Create stylesheet dir if it does not exist
     file: "path={{stylesheet_base_dir}} state=directory"
+    become: yes
 
   - name: Create CSS/Image folder
     file: path={{item}} state=directory
     with_items:
         - "{{stylesheet_base_dir}}/css"
         - "{{stylesheet_base_dir}}/images"
+    become: yes
 
   - name: copy logo image to all masters
     copy: "src={{logo_img}} dest={{stylesheet_base_dir}}/images"
+    become: yes
 
   - name: Copy css file under {stylesheet_base_dir}}/css
     template: src=extensions.css.j2 dest="{{stylesheet_base_dir}}/css/extensions.css" force={{overwrite_force}}
+    become: yes
 
   - name: Webconsole configuration txt file to /etc/origin/master
     template: src=webconsole_conf.txt.j2 dest={{stylesheet_base_dir}}/webconsole_conf.txt force={{overwrite_force}}
+    become: yes
 
   - name: Check the configuration exist in master-config.yaml
     shell: grep extensions {{openshift_master_conf_dir}}/master-config.yaml|wc -l
     register: extension_conf_exist
+    become: yes
    
   - name: Configure master-config.xml to load new logo for web console
     shell: sed -e "$(grep -n assetConfig {{openshift_master_conf_dir}}/master-config.yaml |cut -d':' -f1)r {{stylesheet_base_dir}}/webconsole_conf.txt" -i {{openshift_master_conf_dir}}/master-config.yaml
     when: extension_conf_exist.stdout == '0'
+    become: yes
 
   - name: Clean temp files in local
     file: path={{item}} state=absent
     with_items:
         - "{{stylesheet_base_dir}}/webconsole_conf.txt"
         - "{{logo_img}}"
+    become: yes
 
   - name: Restart Master Daemon
     block:
@@ -73,3 +86,4 @@
       - systemd: state=restarted name=atomic-openshift-master-api
         when: groups['masters']|length|int > 1
     when: restart_master
+    become: yes
